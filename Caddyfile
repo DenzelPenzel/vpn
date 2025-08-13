@@ -1,0 +1,38 @@
+localhost {
+    tls internal
+
+    # Route API requests to the vpn_api service.
+    handle /api/* {
+        reverse_proxy vpn_api:8080
+    }
+
+    # Route WebSocket connections for obfuscation.
+    handle /ws* {
+        reverse_proxy vpn_api:8080 {
+            header_up Upgrade {http.request.header.Upgrade}
+            header_up Connection {http.request.header.Connection}
+        }
+    }
+
+    # Default fallback for any other requests to the API.
+    handle {
+        reverse_proxy vpn_api:8080
+    }
+
+    # Apply security headers to all responses.
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server # Hide Caddy server signature.
+    }
+
+    # Configure logging.
+    log {
+        output file /var/log/caddy/access.log
+        level INFO # Use INFO for better debugging during development.
+    }
+}

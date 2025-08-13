@@ -1,0 +1,87 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: vpn_postgres
+    env_file:
+      - .env
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U root -d vpn"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vpn_network
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: vpn_caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - vpn_network
+    depends_on:
+      - vpn_api
+
+  vpn_api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vpn_api
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - vpn_network
+
+  wireguard:
+    image: linuxserver/wireguard:latest
+    container_name: vpn_wireguard
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    ports:
+      - "51820:51820/udp"
+    environment:  
+      - PUID=1000
+      - PGID=1000
+      - TZ=UTC
+    volumes: [ "./wireguard:/config/wg_confs", "/lib/modules:/lib/modules" ]
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+    networks:
+      - vpn_network
+    privileged: true
+
+  # xray:
+  #   image: teddysun/xray:latest
+  #   container_name: vpn_xray
+  #   environment:
+  #     - TZ=UTC
+  #   volumes:
+  #     - ./v2ray:/etc/xray
+  #   networks:
+  #     - vpn_network
+  #   depends_on:
+  #     - vpn_api
+  #     - wireguard
+  #   command: xray -config=/etc/xray/config.json
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  vpn_network:
+    driver: bridge
