@@ -1,4 +1,4 @@
-# VPN SaaS Service
+# VPN Service
 
 This project is a secure, private, and censorship-resistant SaaS VPN service built with Go, WireGuard, and Docker.
 
