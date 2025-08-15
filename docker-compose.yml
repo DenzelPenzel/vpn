@@ -34,6 +34,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    volumes:
+      - ./wireguard:/etc/wireguard:ro
     container_name: vpn_api
     env_file:
       - .env
@@ -55,7 +57,8 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=UTC
-    volumes: [ "./wireguard:/config/wg_confs", "/lib/modules:/lib/modules" ]
+    volumes: [ "./wireguard:/config", "/lib/modules:/lib/modules" ]
+    entrypoint: ["/bin/bash", "-c", "/config/init-keys.sh && /init"]
     sysctls:
       - net.ipv4.conf.all.src_valid_mark=1
     networks:

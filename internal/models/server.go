@@ -13,7 +13,6 @@ type Server struct {
 	Location   string    `json:"location" db:"location"`
 	Endpoint   string    `json:"endpoint" db:"endpoint"`
 	PublicKey  string    `json:"public_key" db:"public_key"`
-	PrivateKey string    `json:"-" db:"private_key"` // Never expose private key in JSON
 	Port       int       `json:"port" db:"port"`
 	IsActive   bool      `json:"is_active" db:"is_active"`
 	CreatedAt  time.Time `json:"created_at" db:"created_at"`

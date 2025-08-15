@@ -3,6 +3,8 @@ package services
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/denzelpenzel/vpn/internal/models"
 	"github.com/google/uuid"
@@ -71,7 +73,7 @@ func (s *ServerService) GetActiveServers(ctx context.Context) ([]*models.ServerR
 func (s *ServerService) GetServerByID(ctx context.Context, serverID uuid.UUID) (*models.Server, error) {
 	server := &models.Server{}
 	query := `
-		SELECT id, name, location, endpoint, public_key, private_key, port, is_active, created_at, updated_at
+		SELECT id, name, location, endpoint, public_key, port, is_active, created_at, updated_at
 		FROM servers
 		WHERE id = $1 AND is_active = true
 	`
@@ -82,7 +84,6 @@ func (s *ServerService) GetServerByID(ctx context.Context, serverID uuid.UUID) (
 		&server.Location,
 		&server.Endpoint,
 		&server.PublicKey,
-		&server.PrivateKey,
 		&server.Port,
 		&server.IsActive,
 		&server.CreatedAt,
@@ -98,21 +99,20 @@ func (s *ServerService) GetServerByID(ctx context.Context, serverID uuid.UUID) (
 }
 
 // CreateServer creates a new VPN server (admin function)
-func (s *ServerService) CreateServer(ctx context.Context, name, location, endpoint, publicKey, privateKey string, port int) (*models.Server, error) {
+func (s *ServerService) CreateServer(ctx context.Context, name, location, endpoint, publicKey string, port int) (*models.Server, error) {
 	server := &models.Server{}
 	query := `
-		INSERT INTO servers (name, location, endpoint, public_key, private_key, port)
-		VALUES ($1, $2, $3, $4, $5, $6)
-		RETURNING id, name, location, endpoint, public_key, private_key, port, is_active, created_at, updated_at
+		INSERT INTO servers (name, location, endpoint, public_key, port)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING id, name, location, endpoint, public_key, port, is_active, created_at, updated_at
 	`
 
-	err := s.db.QueryRow(ctx, query, name, location, endpoint, publicKey, privateKey, port).Scan(
+	err := s.db.QueryRow(ctx, query, name, location, endpoint, publicKey, port).Scan(
 		&server.ID,
 		&server.Name,
 		&server.Location,
 		&server.Endpoint,
 		&server.PublicKey,
-		&server.PrivateKey,
 		&server.Port,
 		&server.IsActive,
 		&server.CreatedAt,
@@ -133,43 +133,32 @@ func (s *ServerService) CreateServer(ctx context.Context, name, location, endpoi
 }
 
 // InitializeDefaultServers creates default servers if none exist
-func (s *ServerService) InitializeDefaultServers(ctx context.Context, wgService *WireguardService) error {
-	var count int
-	err := s.db.QueryRow(ctx, "SELECT COUNT(*) FROM servers").Scan(&count)
+// SyncServerPublicKey reads the server's public key from a file and updates the database.
+func (s *ServerService) SyncServerPublicKey(ctx context.Context, keyFilePath string, serverID uuid.UUID) error {
+	keyBytes, err := os.ReadFile(keyFilePath)
 	if err != nil {
-		return fmt.Errorf("failed to check server count: %w", err)
+		s.logger.Warn("Could not read public key file", zap.String("path", keyFilePath), zap.Error(err))
+		return fmt.Errorf("could not read public key file: %w", err)
+	}
+	publicKey := strings.TrimSpace(string(keyBytes))
+
+	if publicKey == "" {
+		s.logger.Warn("Public key file is empty", zap.String("path", keyFilePath))
+		return fmt.Errorf("public key file is empty")
 	}
 
-	if count > 0 {
-		s.logger.Info("Servers already exist, skipping initialization")
-		return nil
+	query := `UPDATE servers SET public_key = $1, updated_at = NOW() WHERE id = $2 AND (public_key IS NULL OR public_key != $1)`
+	result, err := s.db.Exec(ctx, query, publicKey, serverID)
+	if err != nil {
+		s.logger.Error("Failed to update server public key in database", zap.Error(err))
+		return fmt.Errorf("failed to update server public key: %w", err)
 	}
 
-	// Create default servers
-	defaultServers := []struct {
-		name     string
-		location string
-		endpoint string
-	}{
-		{"US-East-1", "New York, USA", "vpn-us-east.example.com"},
-		{"EU-West-1", "London, UK", "vpn-eu-west.example.com"},
-		{"Asia-1", "Singapore", "vpn-asia.example.com"},
+	if result.RowsAffected() > 0 {
+		s.logger.Info("Successfully synchronized server public key with database", zap.String("server_id", serverID.String()))
+	} else {
+		s.logger.Info("Server public key is already up-to-date in the database", zap.String("server_id", serverID.String()))
 	}
 
-	for _, srv := range defaultServers {
-		privateKey, publicKey, err := wgService.GenerateKeyPair()
-		if err != nil {
-			s.logger.Error("Failed to generate keys for server", zap.String("name", srv.name), zap.Error(err))
-			continue
-		}
-
-		_, err = s.CreateServer(ctx, srv.name, srv.location, srv.endpoint, publicKey, privateKey, 51820)
-		if err != nil {
-			s.logger.Error("Failed to create default server", zap.String("name", srv.name), zap.Error(err))
-			continue
-		}
-	}
-
-	s.logger.Info("Default servers initialized successfully")
 	return nil
 }
