@@ -13,8 +13,32 @@ import (
 	"github.com/denzelpenzel/vpn/internal/database"
 	"github.com/denzelpenzel/vpn/internal/logger"
 	"github.com/denzelpenzel/vpn/internal/services"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
+
+func synchronizeKeys(serverService *services.ServerService, logger *zap.Logger) {
+	const keyFilePath = "/etc/wireguard/publickey"
+	const serverIDStr = "a7f4c3d6-1b3c-4e8b-9f0e-1d2c3b4a5e6f"
+
+	serverID, err := uuid.Parse(serverIDStr)
+	if err != nil {
+		logger.Fatal("Failed to parse static server ID", zap.Error(err))
+	}
+
+	// Retry logic to wait for the key file to be created by the wireguard container
+	maxRetries := 10
+	for i := 0; i < maxRetries; i++ {
+		err := serverService.SyncServerPublicKey(context.Background(), keyFilePath, serverID)
+		if err == nil {
+			logger.Info("Successfully synchronized WireGuard public key.")
+			return
+		}
+		logger.Warn("Failed to sync WireGuard public key, retrying in 5 seconds...", zap.Error(err), zap.Int("attempt", i+1))
+		time.Sleep(5 * time.Second)
+	}
+	logger.Fatal("Failed to synchronize WireGuard public key after multiple retries. Please check the WireGuard container logs.")
+}
 
 func main() {
 
@@ -48,10 +72,9 @@ func main() {
 	wireguardService.SetDB(db) // Set database connection
 	serverService := services.NewServerService(db, zapLogger)
 
-	// Initialize default servers if needed
-	if err := serverService.InitializeDefaultServers(context.Background(), wireguardService); err != nil {
-		zapLogger.Warn("Failed to initialize default servers", zap.Error(err))
-	}
+	// Synchronize WireGuard public key with the database
+	// This is done in a retry loop to handle cases where the API starts before the key is generated
+	synchronizeKeys(serverService, zapLogger)
 
 	// Initialize API server
 	server := api.NewServer(cfg, zapLogger, userService, authService, wireguardService, serverService)

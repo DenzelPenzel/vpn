@@ -58,7 +58,7 @@ func (s *Server) setupRoutes() {
 	s.router.POST("/api/users/login", s.withMiddleware(s.loginHandler))
 
 	// Protected routes (authentication required)
-	s.router.GET("/api/client/config", s.withMiddleware(s.authMiddleware(s.getConfigHandler)))
+	s.router.POST("/api/client/config", s.withMiddleware(s.authMiddleware(s.getConfigHandler)))
 	s.router.GET("/api/servers/locations", s.withMiddleware(s.authMiddleware(s.getServersHandler)))
 
 	// Health check endpoint

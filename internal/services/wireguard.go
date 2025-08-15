@@ -176,62 +176,6 @@ func (s *WireguardService) GetUserKey(ctx context.Context, userID, serverID uuid
 	return userKey, nil
 }
 
-// GenerateConfig generates a WireGuard configuration for a user
-func (s *WireguardService) GenerateConfig(ctx context.Context, userID, serverID uuid.UUID, clientPrivateKey string) (string, error) {
-	// Get server information
-	server := &models.Server{}
-	serverQuery := `
-		SELECT id, name, location, endpoint, public_key, port
-		FROM servers
-		WHERE id = $1 AND is_active = true
-	`
-
-	err := s.db.QueryRow(ctx, serverQuery, serverID).Scan(
-		&server.ID,
-		&server.Name,
-		&server.Location,
-		&server.Endpoint,
-		&server.PublicKey,
-		&server.Port,
-	)
-
-	if err != nil {
-		s.logger.Error("Server not found", zap.String("server_id", serverID.String()))
-		return "", fmt.Errorf("server not found")
-	}
-
-	// Get user key information
-	userKey, err := s.GetUserKey(ctx, userID, serverID)
-	if err != nil {
-		return "", fmt.Errorf("user key not found: %w", err)
-	}
-
-	// Generate WireGuard configuration
-	config := fmt.Sprintf(`[Interface]
-PrivateKey = %s
-Address = %s
-DNS = 1.1.1.1, 8.8.8.8
-
-[Peer]
-PublicKey = %s
-Endpoint = %s:%d
-AllowedIPs = 0.0.0.0/0, ::/0
-PersistentKeepalive = 25
-`,
-		clientPrivateKey,
-		userKey.AllowedIPs,
-		server.PublicKey,
-		server.Endpoint,
-		server.Port,
-	)
-
-	s.logger.Info("WireGuard config generated",
-		zap.String("user_id", userID.String()),
-		zap.String("server_id", serverID.String()))
-
-	return config, nil
-}
-
 // allocateUserIP allocates an IP address for a user on a server
 func (s *WireguardService) allocateUserIP(ctx context.Context, serverID uuid.UUID) (string, error) {
 	var count int

@@ -3,29 +3,12 @@
 
 -- Note: In production, these keys should be replaced with actual WireGuard keys
 -- These are placeholder keys for development/testing purposes
-INSERT INTO servers (name, location, endpoint, public_key, private_key, port) VALUES
+INSERT INTO servers (id, name, location, endpoint, port) VALUES
 (
-    'US-East-1', 
-    'New York, USA', 
-    'vpn-us-east.example.com', 
-    'PLACEHOLDER_PUBLIC_KEY_US_EAST_REPLACE_IN_PRODUCTION', 
-    'PLACEHOLDER_PRIVATE_KEY_US_EAST_REPLACE_IN_PRODUCTION', 
-    51820
-),
-(
-    'EU-West-1', 
-    'London, UK', 
-    'vpn-eu-west.example.com', 
-    'PLACEHOLDER_PUBLIC_KEY_EU_WEST_REPLACE_IN_PRODUCTION', 
-    'PLACEHOLDER_PRIVATE_KEY_EU_WEST_REPLACE_IN_PRODUCTION', 
-    51820
-),
-(
-    'Asia-1', 
-    'Singapore', 
-    'vpn-asia.example.com', 
-    'PLACEHOLDER_PUBLIC_KEY_ASIA_REPLACE_IN_PRODUCTION', 
-    'PLACEHOLDER_PRIVATE_KEY_ASIA_REPLACE_IN_PRODUCTION', 
+    'a7f4c3d6-1b3c-4e8b-9f0e-1d2c3b4a5e6f', -- Static UUID for consistency
+    'Default Server',
+    'Amazon Linux',
+    '35.78.89.198',
     51820
 )
-ON CONFLICT DO NOTHING;
+ON CONFLICT (id) DO NOTHING;
