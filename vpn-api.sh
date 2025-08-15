@@ -1,8 +1,14 @@
 #!/usr/bin/with-contenv bash
-# This script is run by s6-overlay as a service.
 
-echo "Starting VPN API service..."
+# This script waits for the WireGuard public key and then launches the API server.
+PUBLIC_KEY_FILE="/config/publickey"
 
-# Execute the vpn_api binary
-# The logs will be automatically handled by s6-overlay
+echo "Waiting for WireGuard public key at ${PUBLIC_KEY_FILE}..."
+
+while [ ! -f "${PUBLIC_KEY_FILE}" ]; do
+  sleep 1
+done
+
+echo "WireGuard public key found. Starting VPN API service..."
+
 exec /usr/bin/vpn_api

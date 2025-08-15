@@ -16,11 +16,12 @@ FROM linuxserver/wireguard:latest
 
 COPY --from=builder /app/vpn_api /usr/bin/vpn_api
 
-# Copy the s6-overlay script to run our API service
-# This script will be executed by the s6 process manager
-RUN mkdir -p /etc/s6-overlay/s6-rc.d/vpn-api
-COPY ./vpn-api.sh /etc/s6-overlay/s6-rc.d/vpn-api/run
-RUN echo "longrun" > /etc/s6-overlay/s6-rc.d/vpn-api/type
+# Place the service script in a permanent location that is not affected by the /config volume mount.
+RUN mkdir -p /etc/services.d/vpn-api
+COPY ./vpn-api.sh /etc/services.d/vpn-api/run
+RUN chmod +x /etc/services.d/vpn-api/run
 
-# Ensure the script is executable
-RUN chmod +x /etc/s6-overlay/s6-rc.d/vpn-api/run
+# Create a symbolic link from the location the LSIO entrypoint expects to our permanent script location.
+# This ensures the service is found even after the volume is mounted over /config.
+RUN mkdir -p /config/custom-services.d
+RUN ln -s /etc/services.d/vpn-api /config/custom-services.d/vpn-api
