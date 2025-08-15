@@ -16,16 +16,15 @@ services:
     networks:
       - vpn_network
 
-  caddy:
-    image: caddy:2-alpine
-    container_name: vpn_caddy
+  nginx:
+    image: nginx:latest
+    container_name: vpn_nginx
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./certs:/etc/nginx/certs
     networks:
       - vpn_network
     depends_on:
@@ -78,9 +77,7 @@ services:
   #   command: xray -config=/etc/xray/config.json
 
 volumes:
-  postgres_data:
-  caddy_data:
-  caddy_config:
+  postgres_data: {}
 
 networks:
   vpn_network:
