@@ -18,7 +18,7 @@ import (
 )
 
 func synchronizeKeys(serverService *services.ServerService, logger *zap.Logger) {
-	const keyFilePath = "/etc/wireguard/publickey"
+	const keyFilePath = "/config/publickey"
 	const serverIDStr = "a7f4c3d6-1b3c-4e8b-9f0e-1d2c3b4a5e6f"
 
 	serverID, err := uuid.Parse(serverIDStr)

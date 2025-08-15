@@ -1,40 +1,22 @@
+# Use a multi-stage build to compile the Go application
 FROM golang:1.24-alpine AS builder
-
-RUN apk add --no-cache git ca-certificates tzdata
 
 WORKDIR /app
 
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy source code
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -o /app/vpn_api ./cmd/server
 
-#############################
-# STEP 2 build a small image
-##############################
-FROM alpine:latest
+# --- Final Stage ---
+FROM linuxserver/wireguard:latest
 
-# Install runtime dependencies
-RUN apk --no-cache add ca-certificates wireguard-tools iptables
+COPY --from=builder /app/vpn_api /usr/bin/vpn_api
 
-# Create non-root user
-# RUN adduser -D -s /bin/sh vpnuser
+RUN mkdir -p /etc/s6-overlay/s6-rc.d/vpn-api/serviced.d
+COPY ./vpn-api.sh /etc/s6-overlay/s6-rc.d/vpn-api/run
 
-WORKDIR /root
-
-# Copy the binary from builder stage
-COPY --from=builder /app/main .
-
-# Expose API ports
-EXPOSE 8080
-EXPOSE 3000
-
-# Run as non-root user for security
-# USER vpnuser
-
-# Command to run
-CMD ["./main"]
+RUN chmod +x /etc/s6-overlay/s6-rc.d/vpn-api/run
