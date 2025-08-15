@@ -16,7 +16,11 @@ FROM linuxserver/wireguard:latest
 
 COPY --from=builder /app/vpn_api /usr/bin/vpn_api
 
-RUN mkdir -p /etc/s6-overlay/s6-rc.d/vpn-api/serviced.d
+# Copy the s6-overlay script to run our API service
+# This script will be executed by the s6 process manager
+RUN mkdir -p /etc/s6-overlay/s6-rc.d/vpn-api
 COPY ./vpn-api.sh /etc/s6-overlay/s6-rc.d/vpn-api/run
+RUN echo "longrun" > /etc/s6-overlay/s6-rc.d/vpn-api/type
 
+# Ensure the script is executable
 RUN chmod +x /etc/s6-overlay/s6-rc.d/vpn-api/run
